@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Phase 1: First Night Setup</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f8fafc;
+        }
+
+        .dashed-box {
+            border: 2px dashed #6366f1;
+        }
+    </style>
+</head>
+
+<body class="p-8">
+    <div class="max-w-md mx-auto bg-white rounded-3xl shadow-lg p-8 border border-slate-100">
+        <div class="text-center mb-8">
+            <span
+                class="bg-indigo-600 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest">Night
+                1 Prescription</span>
+        </div>
+
+        <div class="dashed-box rounded-2xl p-6 text-center space-y-6">
+            <div>
+                <p class="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Target Bedtime</p>
+                <div id="res-bed" class="text-5xl font-extrabold text-slate-800">--:--</div>
+            </div>
+            <div class="border-t border-slate-100 pt-4">
+                <p class="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Wake Up Time</p>
+                <div id="res-wake" class="text-5xl font-extrabold text-slate-800">--:--</div>
+            </div>
+        </div>
+
+        <p class="mt-6 text-[11px] text-slate-400 italic text-center">Calculated from baseline query parameters.</p>
+    </div>
+
+    <script>
+        const params = new URLSearchParams(window.location.search);
+
+        function timeToMins(t) { if (!t) return 0; const [h, m] = t.split(':').map(Number); return (h * 60) + m; }
+        function minsToTime(m) {
+            let tm = Math.round(m); while (tm < 0) tm += 1440;
+            return String(Math.floor(tm / 60) % 24).padStart(2, '0') + ":" + String(tm % 60).padStart(2, '0');
+        }
+
+        function calculate() {
+            const bWake = params.get('base_wake') || "00:00";
+            const bBed = params.get('base_bed') || "00:00";
+            const bSol = parseInt(params.get('base_sol') || 0);
+            const bWaso = parseInt(params.get('base_waso') || 0);
+
+            const wakeMins = timeToMins(bWake);
+            const bedMins = timeToMins(bBed);
+            let wakeTotal = wakeMins; if (wakeTotal <= bedMins) wakeTotal += 1440;
+
+            const actualSleep = (wakeTotal - bedMins) - bSol - bWaso;
+            let targetBed = (bSol > 15 && bWaso <= 15) ? (bedMins + bSol) + 30 : wakeTotal - (actualSleep - 30);
+
+            document.getElementById('res-bed').innerText = minsToTime(targetBed);
+            document.getElementById('res-wake').innerText = minsToTime(wakeMins);
+        }
+        window.onload = calculate;
+    </script>
+</body>
+
+</html>
