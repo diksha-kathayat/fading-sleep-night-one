@@ -3,16 +3,24 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Phase 1: Setup (Rounded)</title>
+    <title>Phase 1: Precise 10:15 PM</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f8fafc;
+        }
+    </style>
 </head>
 
-<body class="p-8 bg-slate-50">
+<body class="p-8">
     <div class="max-w-md mx-auto bg-white rounded-3xl shadow-lg p-8 border border-slate-100">
         <div class="text-center mb-8">
             <span
                 class="bg-indigo-600 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest">Night
-                1 & 2</span>
+                1 & 2 Prescription</span>
         </div>
         <div class="border-2 border-dashed border-indigo-400 rounded-2xl p-6 text-center space-y-6">
             <div>
@@ -28,23 +36,34 @@
 
     <script>
         const p = new URLSearchParams(window.location.search);
-        const tToM = (t) => { if (!t) return 0; const [h, m] = t.split(':').map(Number); return (h * 60) + m; };
-        const mToT = (m) => {
-            let tm = Math.round(m / 5) * 5; // ROUND TO NEAREST 5
+
+        function tToM(t) {
+            if (!t) return 0;
+            const [h, m] = t.split(':').map(Number);
+            return (h * 60) + m;
+        }
+
+        function mToT(m) {
+            // Round to the nearest 5-minute increment
+            let tm = Math.round(m / 5) * 5;
             while (tm < 0) tm += 1440;
-            return String(Math.floor(tm / 60) % 24).padStart(2, '0') + ":" + String(tm % 60).padStart(2, '0');
-        };
+            let hours = Math.floor(tm / 60) % 24;
+            let minutes = tm % 60;
+            return String(hours).padStart(2, '0') + ":" + String(minutes).padStart(2, '0');
+        }
 
         function calculate() {
+            // Inputs: 21:08, 16, 21
             const bBed = p.get('base_bed') || "21:08";
             const bWake = p.get('base_wake') || "09:27";
             const bSol = parseInt(p.get('base_sol') || 0);
             const bWaso = parseInt(p.get('base_waso') || 0);
 
-            // Formula: Bedtime + SOL + WASO + 30
-            const targetMins = tToM(bBed) + bSol + bWaso + 30;
+            // Calculation: 1268 (21:08) + 16 + 21 + 30 = 1335 minutes
+            const rawTargetMins = tToM(bBed) + bSol + bWaso + 30;
 
-            document.getElementById('res-bed').innerText = mToT(targetMins);
+            // 1335 minutes / 60 = 22.25 (which is exactly 10:15 PM)
+            document.getElementById('res-bed').innerText = mToT(rawTargetMins);
             document.getElementById('res-wake').innerText = bWake;
         }
         window.onload = calculate;
