@@ -8,30 +8,40 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
 
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            background: transparent;
+        }
+
         body {
             font-family: 'Inter', sans-serif;
-            background: #f8fafc;
         }
     </style>
 </head>
 
-<body class="p-6">
-    <div class="max-w-xl mx-auto bg-white rounded-[2.5rem] p-8 shadow-xl border border-slate-200 text-center">
+<body class="p-2">
+    <div class="max-w-xl mx-auto bg-transparent p-4 text-center">
         <div id="status-tag"
             class="inline-block px-4 py-1 rounded-full text-[10px] font-black uppercase mb-6 tracking-widest"></div>
 
-        <div class="grid grid-cols-2 gap-4 bg-slate-50 p-8 rounded-3xl border-2 border-dashed border-indigo-200">
+        <div class="grid grid-cols-2 gap-4 p-2 rounded-3xl border-2 border-dashed border-indigo-200 bg-transparent">
             <div>
-                <p class="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1">Target Bedtime</p>
-                <div id="res-bed" class="text-4xl font-extrabold text-slate-800">--:--</div>
+                <p class="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2">Target Bedtime</p>
+                <div id="res-bed"
+                    class="text-3xl font-extrabold text-slate-800 tracking-tighter leading-tight whitespace-nowrap">
+                    --:--</div>
             </div>
             <div>
-                <p class="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1">Target Wake Up</p>
-                <div id="res-wake" class="text-4xl font-extrabold text-slate-800">--:--</div>
+                <p class="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2">Target Wake Up</p>
+                <div id="res-wake"
+                    class="text-3xl font-extrabold text-slate-800 tracking-tighter leading-tight whitespace-nowrap">
+                    --:--</div>
             </div>
         </div>
 
-        <div class="mt-6 p-5 bg-indigo-50/50 rounded-2xl">
+        <div class="mt-6 p-5 bg-indigo-50/30 rounded-2xl">
             <p id="logic-info" class="text-xs text-indigo-900 font-medium italic"></p>
             <p id="safety-info" class="text-[10px] text-amber-600 font-bold uppercase mt-2"></p>
         </div>
@@ -40,41 +50,24 @@
     <script>
         const p = new URLSearchParams(window.location.search);
 
-        /**
-         * Smart Parser: Handles "22:30", "10.30pm", "9 15 am", "23.00"
-         */
         const tToM = (t) => {
             if (!t) return 0;
-
-            // Clean string: remove extra spaces, lowercase it
             let str = t.toLowerCase().trim();
             const isPm = str.includes('pm');
             const isAm = str.includes('am');
-
-            // Extract just the numbers (handles : . or space as separators)
             const parts = str.replace(/[apm\s]/g, '').split(/[:.\s]/);
             let h = parseInt(parts[0]) || 0;
             let m = parseInt(parts[1]) || 0;
 
-            // Handle 12-hour logic if AM/PM is present
             if (isPm && h < 12) h += 12;
             if (isAm && h === 12) h = 0;
-
-            // Guessing Logic (if user forgot AM/PM)
             if (!isAm && !isPm) {
-                // If hour is 1-7, it's likely AM (e.g., "7:00" -> 7:00 AM)
-                // If hour is 8-11, it's likely PM (e.g., "9:00" -> 9:00 PM)
-                // If hour is 12-23, it's already 24h format.
                 if (h >= 1 && h <= 7) { /* assume AM */ }
                 else if (h >= 8 && h <= 11) h += 12;
             }
-
             return (h * 60) + m;
         };
 
-        /**
-         * Formatter: Converts minutes to "hh:mm AM/PM"
-         */
         const mToT = (m) => {
             let totalMins = Math.round(m / 5) * 5;
             while (totalMins < 0) totalMins += 1440;
@@ -84,10 +77,10 @@
             let mins = totalMins % 60;
 
             const ampm = h >= 12 ? 'PM' : 'AM';
-            h = h % 12;
-            h = h ? h : 12; // Convert 0 to 12
+            h = h % 12 || 12;
 
-            return `${h}:${String(mins).padStart(2, '0')} ${ampm}`;
+            // Using a smaller font for AM/PM helps prevent the overlap seen in your screenshot
+            return `${h}:${String(mins).padStart(2, '0')}<span class="text-base ml-1 font-bold text-slate-500">${ampm}</span>`;
         };
 
         function run() {
@@ -111,42 +104,34 @@
                 statusTag.innerText = "Phase: Adjustment Mode";
                 statusTag.className = "inline-block px-4 py-1 rounded-full text-[10px] font-black uppercase mb-6 bg-emerald-600 text-white tracking-widest";
 
-                const s1 = parseInt(p.get('first_sol')), s2 = parseInt(p.get('sol_val'));
-                const w1 = parseInt(p.get('first_waso')), w2 = parseInt(p.get('waso_val'));
                 const anchorBed = tToM(p.get('prev_bed'));
                 targetWake = tToM(p.get('prev_wake'));
-
-                const avgSol = (s1 + s2) / 2;
-                const avgWaso = (w1 + w2) / 2;
+                const avgSol = (parseInt(p.get('first_sol')) + parseInt(p.get('sol_val'))) / 2;
+                const avgWaso = (parseInt(p.get('first_waso')) + parseInt(p.get('waso_val'))) / 2;
 
                 targetBed = (avgSol <= 15 && avgWaso <= 15) ? anchorBed - 15 : anchorBed + 15;
-                logic.innerHTML = `Date: ${dateStr}. 15m adjustment based on latency.`;
-
+                logic.innerHTML = `Date: ${dateStr}. 15m shift applied.`;
             } else {
                 statusTag.innerText = "Phase: Static Mode";
                 statusTag.className = "inline-block px-4 py-1 rounded-full text-[10px] font-black uppercase mb-6 bg-indigo-600 text-white tracking-widest";
 
                 const bBed = tToM(p.get('base_bed') || "21:08");
-                const bSol = parseInt(p.get('base_sol') || 16);
-                const bWaso = parseInt(p.get('base_waso') || 21);
                 targetWake = tToM(p.get('base_wake') || "09:27");
-
-                targetBed = bBed + bSol + bWaso + 30;
+                targetBed = bBed + parseInt(p.get('base_sol') || 16) + parseInt(p.get('base_waso') || 21) + 30;
                 logic.innerHTML = `Date: ${dateStr || 'Initial'}. Static calculation active.`;
             }
 
-            // 8-HOUR MINIMUM SAFEGUARD
             let wakeInMins = targetWake;
             let bedInMins = targetBed % 1440;
             if (wakeInMins <= bedInMins) wakeInMins += 1440;
-
             if ((wakeInMins - bedInMins) < 480) {
                 targetBed = targetWake - 480;
                 safety.innerHTML = "⚠️ 8-Hour Minimum Safeguard Applied";
             }
 
-            document.getElementById('res-bed').innerText = mToT(targetBed);
-            document.getElementById('res-wake').innerText = mToT(targetWake);
+            // Using .innerHTML to render the styled AM/PM span
+            document.getElementById('res-bed').innerHTML = mToT(targetBed);
+            document.getElementById('res-wake').innerHTML = mToT(targetWake);
         }
 
         window.onload = run;
