@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Smart Sleep Tracker: MM/DD/YYYY</title>
+    <title>Smart Sleep Tracker</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap');
@@ -23,11 +23,11 @@
         <div class="grid grid-cols-2 gap-4 bg-slate-50 p-8 rounded-3xl border-2 border-dashed border-indigo-200">
             <div>
                 <p class="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1">Target Bedtime</p>
-                <div id="res-bed" class="text-5xl font-extrabold text-slate-800">--:--</div>
+                <div id="res-bed" class="text-4xl font-extrabold text-slate-800">--:--</div>
             </div>
             <div>
                 <p class="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1">Target Wake Up</p>
-                <div id="res-wake" class="text-5xl font-extrabold text-slate-800">--:--</div>
+                <div id="res-wake" class="text-4xl font-extrabold text-slate-800">--:--</div>
             </div>
         </div>
 
@@ -40,11 +40,54 @@
     <script>
         const p = new URLSearchParams(window.location.search);
 
-        const tToM = (t) => { if (!t) return 0; const [h, m] = t.split(':').map(Number); return (h * 60) + m; };
+        /**
+         * Smart Parser: Handles "22:30", "10.30pm", "9 15 am", "23.00"
+         */
+        const tToM = (t) => {
+            if (!t) return 0;
+
+            // Clean string: remove extra spaces, lowercase it
+            let str = t.toLowerCase().trim();
+            const isPm = str.includes('pm');
+            const isAm = str.includes('am');
+
+            // Extract just the numbers (handles : . or space as separators)
+            const parts = str.replace(/[apm\s]/g, '').split(/[:.\s]/);
+            let h = parseInt(parts[0]) || 0;
+            let m = parseInt(parts[1]) || 0;
+
+            // Handle 12-hour logic if AM/PM is present
+            if (isPm && h < 12) h += 12;
+            if (isAm && h === 12) h = 0;
+
+            // Guessing Logic (if user forgot AM/PM)
+            if (!isAm && !isPm) {
+                // If hour is 1-7, it's likely AM (e.g., "7:00" -> 7:00 AM)
+                // If hour is 8-11, it's likely PM (e.g., "9:00" -> 9:00 PM)
+                // If hour is 12-23, it's already 24h format.
+                if (h >= 1 && h <= 7) { /* assume AM */ }
+                else if (h >= 8 && h <= 11) h += 12;
+            }
+
+            return (h * 60) + m;
+        };
+
+        /**
+         * Formatter: Converts minutes to "hh:mm AM/PM"
+         */
         const mToT = (m) => {
-            let tm = Math.round(m / 5) * 5;
-            while (tm < 0) tm += 1440;
-            return String(Math.floor(tm / 60) % 24).padStart(2, '0') + ":" + String(tm % 60).padStart(2, '0');
+            let totalMins = Math.round(m / 5) * 5;
+            while (totalMins < 0) totalMins += 1440;
+            totalMins %= 1440;
+
+            let h = Math.floor(totalMins / 60);
+            let mins = totalMins % 60;
+
+            const ampm = h >= 12 ? 'PM' : 'AM';
+            h = h % 12;
+            h = h ? h : 12; // Convert 0 to 12
+
+            return `${h}:${String(mins).padStart(2, '0')} ${ampm}`;
         };
 
         function run() {
@@ -52,16 +95,12 @@
             const logic = document.getElementById('logic-info');
             const safety = document.getElementById('safety-info');
 
-            // 1. Get Date from URL in MM/DD/YYYY format
             const dateStr = p.get('date_val');
             let isAdjustmentDay = false;
 
             if (dateStr) {
                 const parts = dateStr.split('/');
-                // MM/DD/YYYY -> parts[0] is Month, parts[1] is Day, parts[2] is Year
                 const logDate = new Date(parts[2], parts[0] - 1, parts[1]);
-
-                // ADJUSTMENT TRIGGER: January 29, 2026 (Month is 0-indexed, so 0 = Jan)
                 const switchDate = new Date(2026, 0, 29);
                 if (logDate >= switchDate) isAdjustmentDay = true;
             }
@@ -69,7 +108,6 @@
             let targetBed, targetWake;
 
             if (isAdjustmentDay && p.has('first_sol') && p.has('sol_val')) {
-                // --- PHASE 2: ADJUSTMENT MODE ---
                 statusTag.innerText = "Phase: Adjustment Mode";
                 statusTag.className = "inline-block px-4 py-1 rounded-full text-[10px] font-black uppercase mb-6 bg-emerald-600 text-white tracking-widest";
 
@@ -82,10 +120,9 @@
                 const avgWaso = (w1 + w2) / 2;
 
                 targetBed = (avgSol <= 15 && avgWaso <= 15) ? anchorBed - 15 : anchorBed + 15;
-                logic.innerHTML = `Date: ${dateStr}. 2-night average results in 15m shift.`;
+                logic.innerHTML = `Date: ${dateStr}. 15m adjustment based on latency.`;
 
             } else {
-                // --- PHASE 1: STATIC MODE ---
                 statusTag.innerText = "Phase: Static Mode";
                 statusTag.className = "inline-block px-4 py-1 rounded-full text-[10px] font-black uppercase mb-6 bg-indigo-600 text-white tracking-widest";
 
@@ -99,9 +136,11 @@
             }
 
             // 8-HOUR MINIMUM SAFEGUARD
-            let tempWake = targetWake;
-            if (tempWake <= (targetBed % 1440)) tempWake += 1440;
-            if ((tempWake - (targetBed % 1440)) < 480) {
+            let wakeInMins = targetWake;
+            let bedInMins = targetBed % 1440;
+            if (wakeInMins <= bedInMins) wakeInMins += 1440;
+
+            if ((wakeInMins - bedInMins) < 480) {
                 targetBed = targetWake - 480;
                 safety.innerHTML = "⚠️ 8-Hour Minimum Safeguard Applied";
             }
