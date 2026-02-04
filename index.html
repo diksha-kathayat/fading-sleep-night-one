@@ -21,8 +21,8 @@
     </style>
 </head>
 
-<body class="p-2">
-    <div class="max-w-xl mx-auto bg-transparent p-4 text-center">
+<body class="p-2" id="main-body">
+    <div id="app-container" class="max-w-xl mx-auto bg-transparent p-4 text-center">
         <div id="status-tag"
             class="inline-block px-4 py-1 rounded-full text-[10px] font-black uppercase mb-6 tracking-widest"></div>
 
@@ -79,15 +79,38 @@
             const ampm = h >= 12 ? 'PM' : 'AM';
             h = h % 12 || 12;
 
-            // Using a smaller font for AM/PM helps prevent the overlap seen in your screenshot
             return `${h}:${String(mins).padStart(2, '0')}<span class="text-base ml-1 font-bold text-slate-500">${ampm}</span>`;
         };
 
         function run() {
+            const container = document.getElementById('app-container');
             const statusTag = document.getElementById('status-tag');
             const logic = document.getElementById('logic-info');
             const safety = document.getElementById('safety-info');
 
+            // 1. Eligibility Check Logic
+            const bSol = p.get('base_sol');
+            const bWaso = p.get('base_waso');
+
+            // Check if values exist and are both less than 15
+            if (bSol !== null && bWaso !== null) {
+                if (parseInt(bSol) < 15 && parseInt(bWaso) < 15) {
+                    container.innerHTML = `
+                        <div class="py-10 px-6 bg-white/80 rounded-3xl border-2 border-indigo-100 shadow-sm">
+                            <div class="text-indigo-600 mb-4">
+                                <svg class="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </div>
+                            <h2 class="text-lg font-extrabold text-slate-800 leading-tight mb-2">You may not need this intervention.</h2>
+                            <p class="text-sm text-slate-500 font-medium">Research team will be in contact.</p>
+                        </div>
+                    `;
+                    return; // Stop the rest of the script
+                }
+            }
+
+            // 2. Original Logic (Adjustment vs Static)
             const dateStr = p.get('date_val');
             let isAdjustmentDay = false;
 
@@ -117,10 +140,11 @@
 
                 const bBed = tToM(p.get('base_bed') || "21:08");
                 targetWake = tToM(p.get('base_wake') || "09:27");
-                targetBed = bBed + parseInt(p.get('base_sol') || 16) + parseInt(p.get('base_waso') || 21) + 30;
+                targetBed = bBed + parseInt(bSol || 16) + parseInt(bWaso || 21) + 30;
                 logic.innerHTML = `Date: ${dateStr || 'Initial'}. Static calculation active.`;
             }
 
+            // 3. Safety Safeguard
             let wakeInMins = targetWake;
             let bedInMins = targetBed % 1440;
             if (wakeInMins <= bedInMins) wakeInMins += 1440;
@@ -129,7 +153,7 @@
                 safety.innerHTML = "⚠️ 8-Hour Minimum Safeguard Applied";
             }
 
-            // Using .innerHTML to render the styled AM/PM span
+            // 4. Final Render
             document.getElementById('res-bed').innerHTML = mToT(targetBed);
             document.getElementById('res-wake').innerHTML = mToT(targetWake);
         }
